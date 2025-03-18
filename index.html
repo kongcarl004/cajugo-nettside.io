@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="no">
+<head><!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q7KZMPCCGP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-Q7KZMPCCGP');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Min Fine Side</title>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: #e6f7ff;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .title i {
+            color: red;
+            font-size: 50px;
+            margin: 0 10px;
+        }
+        .title {
+            font-size: 40px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .video-box iframe {
+            width: 560px;
+            height: 315px;
+        }
+        .video-box {
+            margin-top: 20px;
+        }
+        nav {
+            background-color: #333;
+            padding: 10px;
+            text-align: left;
+        }
+        nav ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        nav ul li {
+            display: inline-block;
+            margin-right: 15px;
+        }
+        nav ul li.right {
+            float: right;
+        }
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        nav ul li a.active {
+            color: #4da6ff;
+        }
+        .textbox {
+            background-color: white;
+            padding: 20px;
+            margin: 20px auto;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .textbox h2 {
+            color: #333;
+        }
+        .textbox p {
+            color: #666;
+        }
+        .list-box {
+            background-color: white;
+            padding: 20px;
+            margin: 20px auto;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .list-box h2 {
+            color: #333;
+        }
+        .list-box ul {
+            color: #666;
+            padding-left: 20px;
+            text-align: left;
+        }
+        .list-box ul li {
+            margin-bottom: 10px;
+        }
+        .admin-panel {
+            background-color: white;
+            padding: 20px;
+            margin: 20px auto;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .visitor-details {
+            margin-top: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a class="active" href="index.html">Hjem</a></li>
+            <li><a href="nyheter.html">150 grunner</a></li>
+            <li><a href="kontakt.html">Fotoalbum</a></li>
+            <li><a href="info.html">Daglige Oppdateringer</a></li>
+        </ul>
+    </nav>
+
+    <h1 class="title">
+        <i class="fas fa-heart"></i> Du er den beste jeg vet <i class="fas fa-heart"></i>
+    </h1>
+
+    <div class="textbox">
+        <h2>Kjære Ulrikke</h2>
+        <p>Jeg vil veldig gjerne snakke hvis du gir meg sjansen. Ringer deg 22:15 for deg som vanlig. Savner deg så jævelig, du er favorittpersonen min for alltid. Digger deg.</p>
+    </div>
+
+    <div class="video-box">
+        <h2>Se!!!</h2>
+        <iframe width="560" height="315" src="https://www.youtube.com/embed/BBRdXEiwgkU" frameborder="0" allowfullscreen></iframe>
+    </div>
+
+    <div id="admin-panel" class="admin-panel" style="display:none;">
+        <h2>Besøksstatistikk</h2>
+        <div id="total-visits">Totalt antall besøk: <span id="visit-count">0</span></div>
+        <div id="visitor-list" class="visitor-details"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyChzvl3dfVhrgyu4pWLNsNI1IsNIH61QSc",
+            authDomain: "info-25b7e.firebaseapp.com",
+            projectId: "info-25b7e",
+            storageBucket: "info-25b7e.appspot.com",
+            messagingSenderId: "296180704092",
+            appId: "1:296180704092:web:9e0953c5a6d4d4bea65799"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const visitorsCollection = db.collection('visitors');
+
+        // Enhanced Location Services
+        async function getVisitorLocation() {
+            const services = [
+                'https://ipapi.co/json/',
+                'https://ip-api.com/json',
+                'https://geolocation-db.com/json/'
+            ];
+
+            for (let serviceUrl of services) {
+                try {
+                    const response = await fetch(serviceUrl);
+                    const data = await response.json();
+
+                    return {
+                        ip: data.ip || data.IPv4 || 'Ukjent',
+                        city: data.city || data.location?.city || 'Ukjent by',
+                        region: data.region || data.location?.region || 'Ukjent region',
+                        country: data.country_name || data.country || 'Ukjent land',
+                        countryCode: data.country_code || data.countryCode || 'N/A',
+                        latitude: data.latitude || data.location?.lat || null,
+                        longitude: data.longitude || data.location?.lon || null,
+                        timezone: data.timezone || data.location?.timezone || 'Ukjent tidssone'
+                    };
+                } catch (error) {
+                    console.log(`Failed to fetch from ${serviceUrl}:`, error);
+                }
+            }
+
+            return {
+                ip: 'Ukjent',
+                city: 'Ukjent by',
+                region: 'Ukjent region',
+                country: 'Ukjent land',
+                countryCode: 'N/A',
+                latitude: null,
+                longitude: null,
+                timezone: 'Ukjent tidssone'
+            };
+        }
+
+        // Record Visit Function
+        async function recordVisit() {
+            // Check if already recorded in this session
+            if (sessionStorage.getItem('visitorRecorded')) return;
+
+            try {
+                const location = await getVisitorLocation();
+                
+                // Add visit to Firestore
+                await visitorsCollection.add({
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    location: location,
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    page: window.location.pathname
+                });
+
+                // Update visit counter
+                const counterRef = db.collection('statistics').doc('visits');
+                await db.runTransaction(async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    const currentCount = counterDoc.exists ? counterDoc.data().count + 1 : 1;
+                    transaction.set(counterRef, { count: currentCount });
+                });
+
+                // Mark as recorded in this session
+                sessionStorage.setItem('visitorRecorded', 'true');
+            } catch (error) {
+                console.error("Visit recording error:", error);
+            }
+        }
+
+        // Check for Admin Access
+        function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminCode = urlParams.get('admin');
+            
+            // Secret admin code
+            if (adminCode === 'hemmelig1212') {
+                document.getElementById('admin-panel').style.display = 'block';
+                loadVisitorStats();
+            }
+        }
+
+        // Load Visitor Stats for Admin
+        async function loadVisitorStats() {
+            try {
+                // Get total visits
+                const counterDoc = await db.collection('statistics').doc('visits').get();
+                if (counterDoc.exists) {
+                    document.getElementById('visit-count').textContent = counterDoc.data().count;
+                }
+
+                // Get recent visitors
+                const visitorsSnapshot = await visitorsCollection
+                    .orderBy('timestamp', 'desc')
+                    .limit(20)
+                    .get();
+
+                const visitorList = document.getElementById('visitor-list');
+                visitorList.innerHTML = '';
+
+                visitorsSnapshot.forEach(doc => {
+                    const visitorData = doc.data();
+                    const visitorDiv = document.createElement('div');
+                    
+                    visitorDiv.innerHTML = `
+                        <p>
+                            <strong>Dato:</strong> ${visitorData.timestamp ? new Date(visitorData.timestamp.toDate()).toLocaleString() : 'Ukjent'}
+                            <br><strong>Side:</strong> ${visitorData.page || 'Ukjent'}
+                            <br><strong>Lokasjon:</strong> 
+                            ${visitorData.location.city}, 
+                            ${visitorData.location.region}, 
+                            ${visitorData.location.country}
+                            <br><strong>IP:</strong> ${visitorData.location.ip}
+                        </p>
+                        <hr>
+                    `;
+                    
+                    visitorList.appendChild(visitorDiv);
+                });
+            } catch (error) {
+                console.error("Error loading visitor stats:", error);
+            }
+        }
+
+        // Initialize Page
+        document.addEventListener("DOMContentLoaded", () => {
+            recordVisit();
+            checkAdminAccess();
+        });
+    </script>
+</body>
+</html>
