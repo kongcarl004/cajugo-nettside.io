@@ -157,6 +157,24 @@
         const updatesCollection = db.collection('updates');
         const visitorsCollection = db.collection('visitors');
 
+        // Get Screen Size Information
+        function getScreenInfo() {
+            return {
+                width: window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth,
+                height: window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight,
+                colorDepth: window.screen.colorDepth,
+                pixelRatio: window.devicePixelRatio || 1,
+                orientation: window.screen.orientation ? window.screen.orientation.type : 
+                             (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait')
+            };
+        }
+
+        // Update screen info when window is resized
+        let currentScreenInfo = getScreenInfo();
+        window.addEventListener('resize', () => {
+            currentScreenInfo = getScreenInfo();
+        });
+
         // Enhanced Location Services
         async function getVisitorLocation() {
             const services = [
@@ -204,13 +222,15 @@
 
             try {
                 const location = await getVisitorLocation();
+                const screenInfo = getScreenInfo();
                 
                 // Add visit to Firestore
                 await visitorsCollection.add({
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     location: location,
                     userAgent: navigator.userAgent,
-                    language: navigator.language
+                    language: navigator.language,
+                    screen: screenInfo
                 });
 
                 // Update visit counter
@@ -262,6 +282,11 @@
                     const visitorData = doc.data();
                     const visitorDiv = document.createElement('div');
                     
+                    // Include screen information if available
+                    const screenInfo = visitorData.screen ? 
+                        `<br><strong>Skjermstørrelse:</strong> ${visitorData.screen.width}x${visitorData.screen.height}
+                         <br><strong>Orientering:</strong> ${visitorData.screen.orientation}` : '';
+                    
                     visitorDiv.innerHTML = `
                         <p>
                             <strong>Dato:</strong> ${visitorData.timestamp ? new Date(visitorData.timestamp.toDate()).toLocaleString() : 'Ukjent'}
@@ -270,6 +295,7 @@
                             ${visitorData.location.region}, 
                             ${visitorData.location.country}
                             <br><strong>IP:</strong> ${visitorData.location.ip}
+                            ${screenInfo}
                         </p>
                         <hr>
                     `;
