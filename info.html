@@ -156,6 +156,152 @@
         const db = firebase.firestore();
         const updatesCollection = db.collection('updates');
         const visitorsCollection = db.collection('visitors');
+        const sessionCollection = db.collection('sessions');
+
+        // Time tracking variables
+        let sessionStartTime = new Date();
+        let sessionId = null;
+        let heartbeatInterval = null;
+        let isActive = true;
+        let lastActiveTime = new Date();
+        let totalInactiveTime = 0;
+
+        // Session tracking setup
+        async function setupSessionTracking() {
+            sessionStartTime = new Date();
+            
+            // Generate a unique session ID
+            sessionId = generateSessionId();
+            
+            // Store initial session data
+            try {
+                const location = await getVisitorLocation();
+                await sessionCollection.doc(sessionId).set({
+                    startTime: firebase.firestore.Timestamp.fromDate(sessionStartTime),
+                    lastUpdate: firebase.firestore.Timestamp.fromDate(sessionStartTime),
+                    ongoing: true,
+                    location: location,
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    screen: getScreenInfo(),
+                    page: window.location.pathname,
+                    referrer: document.referrer || 'Direct'
+                });
+                
+                // Start heartbeat to update session duration
+                heartbeatInterval = setInterval(updateSessionDuration, 30000); // every 30 seconds
+                
+                // Set up page visibility detection
+                setupVisibilityTracking();
+                
+                // Store session ID in session storage
+                sessionStorage.setItem('currentSessionId', sessionId);
+                
+            } catch (error) {
+                console.error("Error setting up session tracking:", error);
+            }
+        }
+        
+        // Generate a unique session ID
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // Update session duration periodically
+        async function updateSessionDuration() {
+            if (!sessionId) return;
+            
+            try {
+                const now = new Date();
+                const duration = Math.floor((now - sessionStartTime) / 1000); // duration in seconds
+                const activeTime = duration - Math.floor(totalInactiveTime / 1000);
+                
+                await sessionCollection.doc(sessionId).update({
+                    lastUpdate: firebase.firestore.Timestamp.fromDate(now),
+                    durationSeconds: duration,
+                    activeTimeSeconds: activeTime,
+                    ongoing: true
+                });
+            } catch (error) {
+                console.error("Error updating session duration:", error);
+            }
+        }
+        
+        // End session tracking when user leaves
+        async function endSessionTracking() {
+            if (!sessionId) return;
+            
+            clearInterval(heartbeatInterval);
+            
+            try {
+                const endTime = new Date();
+                const duration = Math.floor((endTime - sessionStartTime) / 1000); // duration in seconds
+                const activeTime = duration - Math.floor(totalInactiveTime / 1000);
+                
+                await sessionCollection.doc(sessionId).update({
+                    endTime: firebase.firestore.Timestamp.fromDate(endTime),
+                    durationSeconds: duration,
+                    activeTimeSeconds: activeTime,
+                    ongoing: false
+                });
+            } catch (error) {
+                console.error("Error ending session tracking:", error);
+            }
+        }
+        
+        // Track when page is visible/hidden
+        function setupVisibilityTracking() {
+            // Track page visibility changes
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Track user activity
+            document.addEventListener('mousemove', updateUserActivity);
+            document.addEventListener('keypress', updateUserActivity);
+            document.addEventListener('click', updateUserActivity);
+            document.addEventListener('scroll', updateUserActivity);
+            
+            // Check for inactivity every minute
+            setInterval(checkInactivity, 60000); // every minute
+        }
+        
+        // Handle visibility change (tab switch, minimizing)
+        function handleVisibilityChange() {
+            if (document.visibilityState === 'hidden') {
+                // User left the page
+                isActive = false;
+                lastActiveTime = new Date();
+            } else {
+                // User returned to the page
+                if (!isActive) {
+                    const now = new Date();
+                    totalInactiveTime += now - lastActiveTime;
+                    isActive = true;
+                }
+            }
+        }
+        
+        // Update last activity time
+        function updateUserActivity() {
+            if (!isActive) {
+                const now = new Date();
+                totalInactiveTime += now - lastActiveTime;
+                isActive = true;
+            }
+            lastActiveTime = new Date();
+        }
+        
+        // Check if user has been inactive
+        function checkInactivity() {
+            const now = new Date();
+            const timeSinceLastActivity = now - lastActiveTime;
+            
+            // If more than 2 minutes with no activity, consider inactive
+            if (timeSinceLastActivity > 120000 && isActive) {
+                isActive = false;
+                totalInactiveTime += timeSinceLastActivity;
+                lastActiveTime = now;
+            }
+        }
 
         // Get Screen Size Information
         function getScreenInfo() {
@@ -257,6 +403,57 @@
             if (adminCode === 'hemmelig1212') {
                 document.getElementById('admin-panel').style.display = 'block';
                 loadVisitorStats();
+                loadSessionStats();
+            }
+        }
+
+        // Load Session Stats for Admin
+        async function loadSessionStats() {
+            try {
+                // Get recent sessions
+                const sessionsSnapshot = await sessionCollection
+                    .orderBy('startTime', 'desc')
+                    .limit(20)
+                    .get();
+
+                // Add session stats to visitor list
+                const visitorList = document.getElementById('visitor-list');
+                
+                if (sessionsSnapshot.empty) {
+                    const noSessionsDiv = document.createElement('div');
+                    noSessionsDiv.innerHTML = '<p><strong>Ingen økter registrert ennå</strong></p>';
+                    visitorList.appendChild(noSessionsDiv);
+                    return;
+                }
+
+                sessionsSnapshot.forEach(doc => {
+                    const sessionData = doc.data();
+                    const sessionDiv = document.createElement('div');
+                    
+                    const duration = sessionData.durationSeconds ? 
+                        `${Math.floor(sessionData.durationSeconds / 60)} min ${sessionData.durationSeconds % 60} sek` : 
+                        'Pågående';
+                    
+                    const activeTime = sessionData.activeTimeSeconds ? 
+                        `${Math.floor(sessionData.activeTimeSeconds / 60)} min ${sessionData.activeTimeSeconds % 60} sek` : 
+                        'Ukjent';
+                    
+                    sessionDiv.innerHTML = `
+                        <p>
+                            <strong>Økt startet:</strong> ${sessionData.startTime ? new Date(sessionData.startTime.toDate()).toLocaleString() : 'Ukjent'}
+                            <br><strong>Økt avsluttet:</strong> ${sessionData.endTime ? new Date(sessionData.endTime.toDate()).toLocaleString() : 'Pågående'}
+                            <br><strong>Varighet:</strong> ${duration}
+                            <br><strong>Aktiv tid:</strong> ${activeTime}
+                            <br><strong>Side:</strong> ${sessionData.page || 'Ukjent'}
+                            <br><strong>Kilde:</strong> ${sessionData.referrer || 'Direkte'}
+                        </p>
+                        <hr>
+                    `;
+                    
+                    visitorList.appendChild(sessionDiv);
+                });
+            } catch (error) {
+                console.error("Error loading session stats:", error);
             }
         }
 
@@ -364,9 +561,15 @@
             }
         }
 
+        // Handle page unload (close or navigate away)
+        window.addEventListener('beforeunload', () => {
+            endSessionTracking();
+        });
+
         // Initialize Page
         document.addEventListener("DOMContentLoaded", () => {
             recordVisit();
+            setupSessionTracking();
             fetchUpdates();
             checkAdminAccess();
         });
